@@ -2,16 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db.models import Q
-from io import BytesIO
 import xml.etree.ElementTree as ET
-
-from io import BytesIO
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse
-from reportlab.lib.fonts import addMapping
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import os
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -121,11 +113,9 @@ def search_reports(request):
     return render(request, 'reports/search.html', {'form': form, 'reports': reports})
 
 
-# ================= ЭКСПОРТ PDF (с регистрацией шрифта Arial) =================
 def export_pdf(request, report_id):
     report = get_object_or_404(Report, pk=report_id)
 
-    # 1. Регистрация шрифта Arial
     arial_path = "C:/Windows/Fonts/arial.ttf"
     if not os.path.exists(arial_path):
         return HttpResponse("Ошибка: Шрифт Arial не найден в системе.", status=500)
@@ -133,23 +123,20 @@ def export_pdf(request, report_id):
     try:
         pdfmetrics.registerFont(TTFont('Arial', arial_path))
     except:
-        pass  # Если уже зарегистрирован
+        pass
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm, topMargin=2 * cm,
                             bottomMargin=2 * cm)
     elements = []
 
-    # Стили
     styles = getSampleStyleSheet()
     style_title = ParagraphStyle(name='Title', fontName='Arial', fontSize=16, alignment=1, spaceAfter=30)
     style_normal = ParagraphStyle(name='Normal', fontName='Arial', fontSize=12, leading=14)
     style_bold = ParagraphStyle(name='Bold', fontName='Arial', fontSize=12, fontWeight='bold')
 
-    # Заголовок
     elements.append(Paragraph(f"Отчёт о продажах №{report.id}", style_title))
 
-    # Инфо
     elements.append(Paragraph(f"<b>Менеджер:</b> {report.manager.full_name}", style_normal))
     elements.append(Paragraph(f"<b>Дата:</b> {report.report_date}", style_normal))
     if report.comments:
@@ -157,7 +144,6 @@ def export_pdf(request, report_id):
 
     elements.append(Spacer(1, 0.5 * cm))
 
-    # Таблица данных
     data = [['Товар', 'Категория', 'Кол-во', 'Цена', 'Сумма']]
 
     for item in report.items.all():
