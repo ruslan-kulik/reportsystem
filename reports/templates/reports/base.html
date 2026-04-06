@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Система отчётности</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #f4f6f9; }
+        nav { background: #2c3e50; padding: 15px; display: flex; gap: 15px; align-items: center; }
+        nav a { color: white; text-decoration: none; padding: 8px 15px; background: #34495e; border-radius: 4px; }
+        nav a:hover { background: #1abc9c; }
+        nav a.active { background: #16a085; }
+        .container { max-width: 1200px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #ecf0f1; }
+        .btn { display: inline-block; padding: 6px 12px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; }
+        .btn-success { background: #27ae60; } .btn-danger { background: #e74c3c; }
+        .messages { padding: 10px; margin-bottom: 10px; background: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 4px; }
+        .form-control, .form-select { width: 100%; padding: 8px; margin: 5px 0 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 200px; }
+        label { font-weight: bold; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+        th { background: #f8f9fa; }
+        .form-control, .form-select { width: 100%; padding: 6px; box-sizing: border-box; }
+        .btn { padding: 6px 12px; cursor: pointer; border: none; border-radius: 4px; color: white; }
+        .btn-primary { background: #007bff; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        .btn-sm { padding: 4px 8px; font-size: 0.8em; }
+        .mt-2 { margin-top: 10px; }
+        .mb-2 { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{% url 'report_list' %}" class="{% if request.resolver_match.url_name == 'report_list' %}active{% endif %}">Все отчёты</a>
+        <a href="{% url 'report_create' %}" class="{% if request.resolver_match.url_name == 'report_create' %}active{% endif %}">Создать отчёт</a>
+        <a href="{% url 'admin_panel' %}" class="{% if request.resolver_match.url_name == 'admin_panel' %}active{% endif %}">Админ </a>
+        <a href="{% url 'search_reports' %}" class="{% if request.resolver_match.url_name == 'search_reports' %}active{% endif %}">Поиск</a>
+    </nav>
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="messages">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

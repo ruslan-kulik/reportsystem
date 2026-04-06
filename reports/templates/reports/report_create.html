@@ -1,0 +1,202 @@
+{% extends 'reports/base.html' %}
+{% block content %}
+<h2>Создание отчёта</h2>
+
+<style>
+    /* Контейнер для одной строки товара */
+    .item-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        background: #fff;
+        padding: 8px;
+        border: 1px solid #ddd;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        width: 100%; /* Важно: строка занимает всю ширину */
+        box-sizing: border-box;
+    }
+
+    /* Пропорции колонок. Используем flex-grow, чтобы они делили место равномерно */
+    .col-product { flex: 3; min-width: 0; }
+    .col-custom { flex: 2.5; min-width: 0; }
+    .col-category { flex: 1.5; min-width: 0; }
+    .col-qty { flex: 1; min-width: 0; }
+    .col-price { flex: 1.5; min-width: 0; }
+    .col-action { flex: 0.5; text-align: center; min-width: 40px; }
+
+    /* Стили полей внутри строки. !important перебивает всё */
+    .item-row input,
+    .item-row select {
+        width: 100% !important;
+        padding: 6px !important;
+        box-sizing: border-box !important;
+        border: 1px solid #ccc !important;
+        border-radius: 4px !important;
+        height: 34px !important; /* Фиксируем высоту полей */
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    .btn-remove {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-weight: bold;
+        height: 34px; /* Высота кнопки как у полей */
+        line-height: 20px;
+    }
+
+    .btn-add {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+
+    .btn-save {
+        background: #27ae60;
+        color: white;
+        border: none;
+        padding: 15px;
+        width: 100%;
+        font-size: 18px;
+        margin-top: 20px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    /* Заголовки колонок */
+    .items-header {
+        display: flex;
+        gap: 10px;
+        padding: 10px 8px;
+        background: #f0f0f0;
+        font-weight: bold;
+        border-bottom: 2px solid #ccc;
+        margin-bottom: 10px;
+        border-radius: 4px 4px 0 0;
+    }
+
+    .hidden-delete { display: none; }
+</style>
+
+<form method="post">{% csrf_token %}
+
+    <!-- Шапка -->
+    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+            <label>{{ report_form.manager.label }}</label>
+            {{ report_form.manager }}
+        </div>
+        <div style="flex: 1;">
+            <label>{{ report_form.report_date.label }}</label>
+            {{ report_form.report_date }}
+        </div>
+    </div>
+    <div style="margin-bottom: 15px;">
+        <label>{{ report_form.comments.label }}</label>
+        {{ report_form.comments }}
+    </div>
+
+    <hr>
+    <h3>Товары</h3>
+
+    <!-- Заголовки -->
+    <div class="items-header">
+        <div class="col-product">Товар (список)</div>
+        <div class="col-custom">Своё название</div>
+        <div class="col-category">Категория</div>
+        <div class="col-qty">Кол-во</div>
+        <div class="col-price">Цена</div>
+        <div class="col-action"></div>
+    </div>
+
+    <!-- Контейнер для строк -->
+    <div id="items-container">
+        {% for form in item_formset %}
+        <div class="item-row">
+            <div class="col-product">{{ form.product }}</div>
+            <div class="col-custom">{{ form.custom_product_name }}</div>
+            <div class="col-category">{{ form.category }}</div>
+            <div class="col-qty">{{ form.quantity }}</div>
+            <div class="col-price">{{ form.price_used }}</div>
+            <div class="col-action">
+                <span class="hidden-delete">{{ form.DELETE }}</span>
+                <button type="button" class="btn-remove">✕</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button type="button" class="btn-add" id="add-item-btn">Добавить товар</button>
+
+    <!-- Шаблон пустой формы (скрыт) -->
+    <div id="empty-form-template" style="display:none;">
+        <div class="item-row">
+            <div class="col-product">{{ item_formset.empty_form.product }}</div>
+            <div class="col-custom">{{ item_formset.empty_form.custom_product_name }}</div>
+            <div class="col-category">{{ item_formset.empty_form.category }}</div>
+            <div class="col-qty">{{ item_formset.empty_form.quantity }}</div>
+            <div class="col-price">{{ item_formset.empty_form.price_used }}</div>
+            <div class="col-action">
+                <span class="hidden-delete">{{ item_formset.empty_form.DELETE }}</span>
+                <button type="button" class="btn-remove">✕</button>
+            </div>
+        </div>
+    </div>
+
+    {{ item_formset.management_form }}
+
+    <button type="submit" class="btn-save">Сохранить отчёт</button>
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('items-container');
+        const addBtn = document.getElementById('add-item-btn');
+        // Получаем чистый HTML шаблона
+        const templateHtml = document.getElementById('empty-form-template').innerHTML.trim();
+        const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+
+        function updateIndices() {
+            const rows = container.querySelectorAll('.item-row');
+            rows.forEach((row, index) => {
+                const inputs = row.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    // Заменяем индекс в name и id
+                    input.name = input.name.replace(/items-\d+-|items-__prefix__-/, `items-${index}-`);
+                    input.id = input.id.replace(/items-\d+-|items-__prefix__-/, `items-${index}-`);
+                });
+            });
+            totalFormsInput.value = rows.length;
+        }
+
+        addBtn.addEventListener('click', function() {
+            const newRow = document.createElement('div');
+            newRow.className = 'item-row';
+            newRow.innerHTML = templateHtml;
+            container.appendChild(newRow);
+            updateIndices();
+        });
+
+        container.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-remove')) {
+                const rows = container.querySelectorAll('.item-row');
+                if (rows.length > 1) {
+                    e.target.closest('.item-row').remove();
+                    updateIndices();
+                } else {
+                    alert("Нельзя удалить последнюю строку.");
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

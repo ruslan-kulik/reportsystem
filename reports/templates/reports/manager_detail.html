@@ -1,0 +1,20 @@
+{% extends 'reports/base.html' %}
+{% block content %}
+<h2>Отчёты менеджера: {{ manager.full_name }}</h2>
+<a href="{% url 'report_list' %}" class="btn">← Назад ко всем</a>
+<table>
+    <tr><th>ID</th><th>Дата</th><th>Комментарий</th><th>Экспорт</th></tr>
+    {% for r in reports %}
+    <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.report_date }}</td>
+        <td>{{ r.comments|default:"-" }}</td>
+        <td>
+            <a href="{% url 'export_pdf' r.id %}" class="btn" target="_blank">PDF</a>
+            <a href="{% url 'export_xlsx' r.id %}" class="btn btn-success">XLSX</a>
+            <a href="{% url 'export_xml' r.id %}" class="btn btn-success">XML</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

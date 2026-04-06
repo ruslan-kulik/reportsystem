@@ -1,0 +1,18 @@
+{% extends 'reports/base.html' %}
+{% block content %}
+<h2>Управление справочниками</h2>
+<div class="form-row">
+    <div class="form-group"><h3>Менеджеры</h3>
+        <form method="post">{% csrf_token %} {{ manager_form.as_p }} <button name="manager_submit" class="btn btn-success">Добавить</button></form>
+        <ul>{% for m in managers %}<li>{{ m }}</li>{% endfor %}</ul>
+    </div>
+    <div class="form-group"><h3>Категории</h3>
+        <form method="post">{% csrf_token %} {{ category_form.as_p }} <button name="category_submit" class="btn btn-success">Добавить</button></form>
+        <ul>{% for c in categories %}<li>{{ c }}</li>{% endfor %}</ul>
+    </div>
+    <div class="form-group"><h3>Товары</h3>
+        <form method="post">{% csrf_token %} {{ product_form.as_p }} <button name="product_submit" class="btn btn-success">Добавить</button></form>
+        <ul>{% for p in products %}<li>{{ p.name }} ({{ p.category }}) - {{ p.base_price }} BYN</li>{% endfor %}</ul>
+    </div>
+</div>
+{% endblock %}

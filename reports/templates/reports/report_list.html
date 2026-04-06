@@ -1,0 +1,20 @@
+{% extends 'reports/base.html' %}
+{% block content %}
+<h2>Все отчёты</h2>
+<table>
+    <tr><th>ID</th><th>Менеджер (нажмите для фильтра)</th><th>Дата</th><th>Действия</th></tr>
+    {% for r in reports %}
+    <tr>
+        <td>{{ r.id }}</td>
+        <td><a href="{% url 'manager_detail' r.manager.id %}">{{ r.manager.full_name }}</a></td>
+        <td>{{ r.report_date }}</td>
+        <td>
+            <a href="{% url 'export_pdf' r.id %}" class="btn" target="_blank">PDF</a>
+            <a href="{% url 'export_xlsx' r.id %}" class="btn btn-success">XLSX</a>
+            <a href="{% url 'export_xml' r.id %}" class="btn btn-success">XML</a>
+        </td>
+    </tr>
+    {% empty %}<tr><td colspan="4">Отчётов нет</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

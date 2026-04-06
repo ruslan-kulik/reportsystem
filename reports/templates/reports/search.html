@@ -1,0 +1,78 @@
+{% extends 'reports/base.html' %}
+{% block content %}
+<h2>Поиск отчётов</h2>
+
+<form method="get" style="margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 8px;">
+    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 150px;">
+            <label>Дата от:</label>
+            {{ form.date_from }}
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+            <label>Дата до:</label>
+            {{ form.date_to }}
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+            <label>Менеджер:</label>
+            {{ form.manager }}
+        </div>
+        <div style="flex: 2; min-width: 200px;">
+            <label>Символы:</label>
+            {{ form.keyword }}
+        </div>
+        <div>
+            <button type="submit" class="btn btn-success">Найти</button>
+            <a href="{% url 'search_reports' %}" class="btn" style="background: #95a5a6;">Сброс</a>
+        </div>
+    </div>
+</form>
+
+<h3>Результаты ({{ reports.count }})</h3>
+
+{% if reports %}
+<table class="generic-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Менеджер</th>
+            <th>Дата</th>
+            <th>Комментарий</th>
+            <th>Товары (пример)</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in reports %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td><a href="{% url 'manager_detail' r.manager.id %}">{{ r.manager.full_name }}</a></td>
+            <td>{{ r.report_date }}</td>
+            <td>{{ r.comments|truncatechars:40|default:"-" }}</td>
+            <td>
+                {% for item in r.items.all|slice:":3" %}
+                    {% if item.custom_product_name %}
+                        {{ item.custom_product_name }}
+                    {% elif item.product %}
+                        {{ item.product.name }}
+                    {% else %}
+                        Нет названия
+                    {% endif %}
+
+                    {% if not forloop.last %}, {% endif %}
+                {% endfor %}
+                {% if r.items.count > 3 %}...{% endif %}
+            </td>
+            <td>
+                <a href="{% url 'export_pdf' r.id %}" class="btn btn-sm" target="_blank">PDF</a>
+                <a href="{% url 'export_xlsx' r.id %}" class="btn btn-sm btn-success">XLSX</a>
+                <a href="{% url 'export_xml' r.id %}" class="btn btn-sm" style="background:#f39c12">XML</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: #666; font-style: italic;">Ничего не найдено по вашему запросу.</p>
+{% endif %}
+
+{% endblock %}
