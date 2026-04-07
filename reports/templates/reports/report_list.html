@@ -11,7 +11,7 @@
         <td>
             <a href="{% url 'export_pdf' r.id %}" class="btn" target="_blank">PDF</a>
             <a href="{% url 'export_xlsx' r.id %}" class="btn btn-success">XLSX</a>
-            <a href="{% url 'export_xml' r.id %}" class="btn btn-success">XML</a>
+            <a href="{% url 'export_xml' r.id %}" class="btn btn-success" style="background:#f39c12">XML</a>
         </td>
     </tr>
     {% empty %}<tr><td colspan="4">Отчётов нет</td></tr>
