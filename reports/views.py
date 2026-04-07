@@ -92,26 +92,43 @@ def report_create(request):
     })
 
 
+# reports/views.py
+
 def search_reports(request):
     form = SearchForm(request.GET or None)
     reports = Report.objects.select_related('manager').prefetch_related('items').all()
 
     if form.is_valid():
         cd = form.cleaned_data
+
         if cd['date_from']:
             reports = reports.filter(report_date__gte=cd['date_from'])
         if cd['date_to']:
             reports = reports.filter(report_date__lte=cd['date_to'])
+
         if cd['manager']:
             reports = reports.filter(manager=cd['manager'])
+
         if cd['keyword']:
             kw = cd['keyword']
-            q_objects = Q(comments__icontains=kw) | Q(manager__full_name__icontains=kw)
+
+            q_objects = Q()
+
+            q_objects |= Q(comments__icontains=kw)
+
+            q_objects |= Q(manager__full_name__icontains=kw)
+
             q_objects |= Q(items__product__name__icontains=kw) | Q(items__custom_product_name__icontains=kw)
+
+            q_objects |= Q(items__category__name__icontains=kw)
+
+            q_objects |= Q(report_date__icontains=kw)
+
+            q_objects |= Q(items__price_used__icontains=kw)
+
             reports = reports.filter(q_objects).distinct()
 
     return render(request, 'reports/search.html', {'form': form, 'reports': reports})
-
 
 def export_pdf(request, report_id):
     report = get_object_or_404(Report, pk=report_id)
