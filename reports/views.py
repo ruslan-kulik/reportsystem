@@ -2,46 +2,42 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db.models import Q
+from io import BytesIO
 import xml.etree.ElementTree as ET
-from django.shortcuts import get_object_or_404, render
+import os
+
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from io import BytesIO
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
-import os
+from reportlab.lib.units import cm
+
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 from .models import Report, Manager, Category, Product, ReportItem
 from .forms import (
     ManagerForm, CategoryForm, ProductForm,
     ReportForm, ReportItemFormSet, SearchForm
 )
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from datetime import datetime
+
 
 def admin_panel(request):
     if request.method == 'POST':
         if 'manager_submit' in request.POST:
             form = ManagerForm(request.POST)
-            if form.is_valid():
-                form.save()
-                messages.success(request, "Менеджер добавлен")
+            if form.is_valid(): form.save(); messages.success(request, "Менеджер добавлен")
         elif 'category_submit' in request.POST:
             form = CategoryForm(request.POST)
-            if form.is_valid():
-                form.save()
-                messages.success(request, "Категория добавлена")
+            if form.is_valid(): form.save(); messages.success(request, "Категория добавлена")
         elif 'product_submit' in request.POST:
             form = ProductForm(request.POST)
-            if form.is_valid():
-                form.save()
-                messages.success(request, "Товар добавлен")
+            if form.is_valid(): form.save(); messages.success(request, "Товар добавлен")
         return redirect('admin_panel')
 
     return render(request, 'reports/admin_panel.html', {
@@ -92,55 +88,38 @@ def report_create(request):
     })
 
 
-# reports/views.py
-
 def search_reports(request):
     form = SearchForm(request.GET or None)
     reports = Report.objects.select_related('manager').prefetch_related('items').all()
 
     if form.is_valid():
         cd = form.cleaned_data
-
-        if cd['date_from']:
-            reports = reports.filter(report_date__gte=cd['date_from'])
-        if cd['date_to']:
-            reports = reports.filter(report_date__lte=cd['date_to'])
-
-        if cd['manager']:
-            reports = reports.filter(manager=cd['manager'])
+        if cd['date_from']: reports = reports.filter(report_date__gte=cd['date_from'])
+        if cd['date_to']: reports = reports.filter(report_date__lte=cd['date_to'])
+        if cd['manager']: reports = reports.filter(manager=cd['manager'])
 
         if cd['keyword']:
             kw = cd['keyword']
-
-            q_objects = Q()
-
-            q_objects |= Q(comments__icontains=kw)
-
-            q_objects |= Q(manager__full_name__icontains=kw)
-
+            q_objects = Q(comments__icontains=kw) | Q(manager__full_name__icontains=kw)
             q_objects |= Q(items__product__name__icontains=kw) | Q(items__custom_product_name__icontains=kw)
-
             q_objects |= Q(items__category__name__icontains=kw)
-
-            q_objects |= Q(report_date__icontains=kw)
-
-            q_objects |= Q(items__price_used__icontains=kw)
+            q_objects |= Q(report_date__icontains=kw)  # Поиск по части даты (например "2026" или "-04-")
+            q_objects |= Q(items__price_used__icontains=kw)  # Поиск по цене
 
             reports = reports.filter(q_objects).distinct()
 
     return render(request, 'reports/search.html', {'form': form, 'reports': reports})
 
+
 def export_pdf(request, report_id):
     report = get_object_or_404(Report, pk=report_id)
 
     arial_path = "C:/Windows/Fonts/arial.ttf"
-    if not os.path.exists(arial_path):
-        return HttpResponse("Ошибка: Шрифт Arial не найден в системе.", status=500)
-
-    try:
-        pdfmetrics.registerFont(TTFont('Arial', arial_path))
-    except:
-        pass
+    if os.path.exists(arial_path):
+        try:
+            pdfmetrics.registerFont(TTFont('Arial', arial_path))
+        except:
+            pass
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm, topMargin=2 * cm,
@@ -150,10 +129,8 @@ def export_pdf(request, report_id):
     styles = getSampleStyleSheet()
     style_title = ParagraphStyle(name='Title', fontName='Arial', fontSize=16, alignment=1, spaceAfter=30)
     style_normal = ParagraphStyle(name='Normal', fontName='Arial', fontSize=12, leading=14)
-    style_bold = ParagraphStyle(name='Bold', fontName='Arial', fontSize=12, fontWeight='bold')
 
     elements.append(Paragraph(f"Отчёт о продажах №{report.id}", style_title))
-
     elements.append(Paragraph(f"<b>Менеджер:</b> {report.manager.full_name}", style_normal))
     elements.append(Paragraph(f"<b>Дата:</b> {report.report_date}", style_normal))
     if report.comments:
@@ -162,7 +139,6 @@ def export_pdf(request, report_id):
     elements.append(Spacer(1, 0.5 * cm))
 
     data = [['Товар', 'Категория', 'Кол-во', 'Цена', 'Сумма']]
-
     for item in report.items.all():
         name = item.custom_product_name or (item.product.name if item.product else "-")
         cat = item.category.name if item.category else "-"
@@ -181,12 +157,121 @@ def export_pdf(request, report_id):
     ]))
 
     elements.append(table)
-
     doc.build(elements)
 
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="report_{report.id}.pdf"'
     return response
+
+
+def export_docx(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+    document = Document()
+
+    heading = document.add_heading(f'Отчёт о продажах №{report.id}', 0)
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    p = document.add_paragraph()
+    p.add_run(f'Менеджер: ').bold = True
+    p.add_run(report.manager.full_name)
+    p.add_run(f'\nДата: ').bold = True
+    p.add_run(str(report.report_date))
+    if report.comments:
+        p.add_run(f'\nКомментарий: ').bold = True
+        p.add_run(report.comments)
+
+    table = document.add_table(rows=1, cols=5)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Товар'
+    hdr_cells[1].text = 'Категория'
+    hdr_cells[2].text = 'Кол-во'
+    hdr_cells[3].text = 'Цена (BYN)'
+    hdr_cells[4].text = 'Сумма (BYN)'
+
+    for item in report.items.all():
+        row_cells = table.add_row().cells
+        row_cells[0].text = item.custom_product_name or (item.product.name if item.product else "-")
+        row_cells[1].text = item.category.name if item.category else "-"
+        row_cells[2].text = str(item.quantity)
+        row_cells[3].text = f"{float(item.price_used or 0):.2f}"
+        row_cells[4].text = f"{(float(item.price_used or 0) * item.quantity):.2f}"
+
+    buffer = BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer.read(),
+                            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = f'inline; filename="report_{report.id}.docx"'
+    return response
+
+
+def export_xlsx(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Отчет {report.id}"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="FF071ff5", end_color="FF071ff5", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'),
+                         bottom=Side(style='thin'))
+
+    ws.merge_cells('A1:E1')
+    cell_title = ws['A1']
+    cell_title.value = f"ОТЧЁТ О ПРОДАЖАХ №{report.id}"
+    cell_title.font = Font(bold=True, size=14)
+    cell_title.alignment = Alignment(horizontal="center")
+    ws.append([])
+
+    ws.append(["Менеджер:", report.manager.full_name])
+    ws.append(["Дата отчёта:", report.report_date])
+    if report.comments: ws.append(["Комментарий:", report.comments])
+    ws.append([])
+
+    headers = ["№", "Наименование товара", "Категория", "Количество", "Цена (BYN)", "Сумма (BYN)"]
+    ws.append(headers)
+
+    for cell in ws[ws.max_row]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = thin_border
+        cell.alignment = center_align
+
+    total_sum = 0
+    for idx, item in enumerate(report.items.all(), 1):
+        name = item.custom_product_name or (item.product.name if item.product else "Не указано")
+        category = item.category.name if item.category else "-"
+        qty = item.quantity
+        price = float(item.price_used or 0)
+        item_sum = qty * price
+        total_sum += item_sum
+
+        ws.append([idx, name, category, qty, price, item_sum])
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal="right")
+
+    ws.append(["", "", "", "ИТОГО:", "", total_sum])
+    total_row = ws[ws.max_row]
+    total_row[3].font = Font(bold=True)
+    total_row[5].font = Font(bold=True)
+    total_row[5].number_format = '#,##0.00'
+
+    column_widths = [5, 40, 20, 10, 15, 15]
+    for i, width in enumerate(column_widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = width
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'inline; filename=report_{report.id}.xlsx'
+    wb.save(response)
+    return response
+
+
 def export_xml(request, report_id):
     report = get_object_or_404(Report, pk=report_id)
     root = ET.Element("Report", id=str(report.id), manager=report.manager.full_name, date=str(report.report_date))
@@ -205,86 +290,6 @@ def export_xml(request, report_id):
     xml_response = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_str
 
     response = HttpResponse(xml_response, content_type='text/xml; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="report_{report.id}.xml"'
+    response['Content-Disposition'] = f'inline; filename="report_{report.id}.xml"'
     return response
 
-
-
-
-
-def export_xlsx(request, report_id):
-    report = get_object_or_404(Report, pk=report_id)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"Отчет {report.id}"
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    center_align = Alignment(horizontal="center", vertical="center")
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
-    ws.merge_cells('A1:E1')
-    cell_title = ws['A1']
-    cell_title.value = f"ОТЧЁТ О ПРОДАЖАХ №{report.id}"
-    cell_title.font = Font(bold=True, size=14)
-    cell_title.alignment = Alignment(horizontal="center")
-
-    ws.append([])
-
-    ws.append(["Менеджер:", report.manager.full_name])
-    ws.append(["Дата отчёта:", report.report_date])
-    if report.comments:
-        ws.append(["Комментарий:", report.comments])
-
-    ws.append([])
-
-    headers = ["№", "Наименование товара", "Категория", "Количество", "Цена (BYN)", "Сумма (BYN)"]
-    ws.append(headers)
-
-    for cell in ws[ws.max_row]:
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.border = thin_border
-        cell.alignment = center_align
-
-    row_num = ws.max_row + 1
-    total_sum = 0
-
-    for idx, item in enumerate(report.items.all(), 1):
-        name = item.custom_product_name or (item.product.name if item.product else "Не указано")
-        category = item.category.name if item.category else "-"
-        qty = item.quantity
-        price = float(item.price_used or 0)
-        item_sum = qty * price
-        total_sum += item_sum
-
-        ws.append([idx, name, category, qty, price, item_sum])
-
-        for cell in ws[ws.max_row]:
-            cell.border = thin_border
-            if isinstance(cell.value, (int, float)):
-                cell.number_format = '#,##0.00'  # Формат числа с копейками
-                cell.alignment = Alignment(horizontal="right")
-
-    ws.append(["", "", "", "ИТОГО:", "", total_sum])
-    total_row = ws[ws.max_row]
-    total_row[3].font = Font(bold=True)
-    total_row[5].font = Font(bold=True)
-    total_row[5].number_format = '#,##0.00'
-
-    column_widths = [5, 40, 20, 10, 15, 15]
-    for i, width in enumerate(column_widths, 1):
-        ws.column_dimensions[chr(64 + i)].width = width
-
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    response['Content-Disposition'] = f'attachment; filename=report_{report.id}.xlsx'
-    wb.save(response)
-    return response

@@ -8,6 +8,7 @@ urlpatterns = [
     path('search/', views.search_reports, name='search_reports'),
     path('manager/<int:manager_id>/', views.manager_detail, name='manager_detail'),
     path('export/pdf/<int:report_id>/', views.export_pdf, name='export_pdf'),
-    path('export/xml/<int:report_id>/', views.export_xml, name='export_xml'),
+    path('export/docx/<int:report_id>/', views.export_docx, name='export_docx'),
     path('export/xlsx/<int:report_id>/', views.export_xlsx, name='export_xlsx'),
+    path('export/xml/<int:report_id>/', views.export_xml, name='export_xml'),
 ]
