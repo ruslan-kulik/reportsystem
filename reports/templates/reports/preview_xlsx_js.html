@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Отчёт №{{ report.id }}</title>
+    <link rel="stylesheet" href="https://unpkg.com/x-data-spreadsheet@1.1.9/dist/xspreadsheet.css">
+    <script src="https://unpkg.com/x-data-spreadsheet@1.1.9/dist/xspreadsheet.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background: #f0f2f5; }
+        .toolbar { background: #217346; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar a { color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .toolbar a:hover { background: rgba(255,255,255,0.3); }
+        #spreadsheet-container { height: calc(100vh - 50px); background: white; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <span> Отчёт №{{ report.id }}</span>
+        <a href="{% url 'get_xlsx_file' report.id %}" download> Скачать оригинал .xlsx</a>
+    </div>
+    <div id="spreadsheet-container"></div>
+
+    <script>
+        fetch('{% url "get_xlsx_file" report.id %}')
+            .then(response => response.arrayBuffer())
+            .then(data => {
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const firstSheet = workbook.Sheets[firstSheetName];
+
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                const xspreadsheetData = {};
+
+                jsonData.forEach((row, rowIndex) => {
+                    const cells = {};
+                    row.forEach((cell, colIndex) => {
+                        if (cell !== undefined && cell !== null && cell !== '') {
+                            cells[colIndex] = { text: String(cell) };
+                        }
+                    });
+                    xspreadsheetData[rowIndex] = { cells: cells };
+                });
+
+                console.log("Данные подготовлены:", xspreadsheetData);
+
+                const xs = new x_spreadsheet('#spreadsheet-container', {
+                    showToolbar: true,      // Включим панель инструментов
+                    showGrid: true,
+                    showContextMenu: false,
+                    mode: 'read'            // Только чтение
+                });
+
+                xs.loadData([{
+                    name: firstSheetName,
+                    rows: xspreadsheetData
+                }]);
+            })
+            .catch(err => {
+                console.error('Ошибка:', err);
+                document.getElementById('spreadsheet-container').innerHTML =
+                    '<p style="padding:20px; color:red;">Ошибка: ' + err.message + '</p>';
+            });
+    </script>
+</body>
+</html>

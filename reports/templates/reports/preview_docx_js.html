@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Отчёт №{{ report.id }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        body { margin: 0; background: #e3e3e3; font-family: 'Segoe UI', Arial, sans-serif; }
+        .toolbar { background: #2b579a; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+        .toolbar a { color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 4px; }
+        .doc-container {
+            max-width: 210mm; margin: 20px auto; background: white;
+            padding: 25mm; min-height: 297mm; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .doc-container h1 { color: #2b579a; border-bottom: 2px solid #2b579a; padding-bottom: 5px; }
+        .doc-container table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .doc-container th, .doc-container td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .doc-container th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <span>Отчёт №{{ report.id }}</span>
+        <a href="{% url 'get_docx_file' report.id %}" download>Скачать оригинал .docx</a>
+    </div>
+    <div class="doc-container" id="doc-output">
+        <p style="text-align:center; color:#666;">Загрузка документа...</p>
+    </div>
+
+    <script>
+        fetch('{% url "get_docx_file" report.id %}')
+            .then(response => response.arrayBuffer())
+            .then(arrayBuffer => {
+                return mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+            })
+            .then(result => {
+                document.getElementById('doc-output').innerHTML = result.value;
+            })
+            .catch(err => {
+                console.error('Ошибка:', err);
+                document.getElementById('doc-output').innerHTML =
+                    '<p style="color:red;">Ошибка загрузки документа: ' + err + '</p>';
+            });
+    </script>
+</body>
+</html>

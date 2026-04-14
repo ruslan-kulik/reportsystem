@@ -86,8 +86,8 @@
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 5px;">
                         <a href="{% url 'export_pdf' r.id %}" class="btn btn-sm" target="_blank">PDF</a>
-                        <a href="{% url 'export_docx' r.id %}" class="btn btn-sm" target="_blank" style="background: #071ff5">DOCX</a>
-                        <a href="{% url 'export_xlsx' r.id %}" class="btn btn-sm" target="_blank" style="background: green">XLSX</a>
+                        <a href="{% url 'preview_xlsx_js' r.id %}" class="btn btn-sm" target="_blank" style="background: blue">XLSX</a>
+                        <a href="{% url 'preview_docx_js' r.id %}" class="btn btn-sm" target="_blank" style="background: green">DOCX</a>
                         <a href="{% url 'export_xml' r.id %}" class="btn btn-sm" target="_blank" style="background: orange">XML</a>
                     </div>
                 </td>

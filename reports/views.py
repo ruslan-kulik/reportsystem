@@ -5,6 +5,16 @@ from django.db.models import Q
 from io import BytesIO
 import xml.etree.ElementTree as ET
 import os
+from django.urls import reverse
+import pandas as pd
+import mammoth
+from io import BytesIO
+import os
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
+from .models import Report
+import shutil
+
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
@@ -293,3 +303,142 @@ def export_xml(request, report_id):
     response['Content-Disposition'] = f'inline; filename="report_{report.id}.xml"'
     return response
 
+
+def preview_xlsx_js(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+    file_path = os.path.join('media', 'exports', f'report_{report_id}.xlsx')
+
+    if not os.path.exists(file_path):
+        from .views import export_xlsx
+        from django.http import HttpResponse
+        import tempfile
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            response = export_xlsx(request, report_id)
+            tmp.write(response.content)
+            tmp_path = tmp.name
+        shutil.move(tmp_path, file_path)
+
+    if not os.path.exists(file_path):
+        raise Http404("Файл не найден")
+
+    return render(request, 'reports/preview_xlsx_js.html',
+                  {'report': report, 'file_url': f'/media/exports/report_{report_id}.xlsx'})
+
+
+def preview_docx_js(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+    file_path = os.path.join('media', 'exports', f'report_{report_id}.docx')
+
+    if not os.path.exists(file_path):
+        from .views import export_docx
+        import tempfile
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
+            response = export_docx(request, report_id)
+            tmp.write(response.content)
+            tmp_path = tmp.name
+        shutil.move(tmp_path, file_path)
+
+    if not os.path.exists(file_path):
+        raise Http404("Файл не найден")
+
+    return render(request, 'reports/preview_docx_js.html',
+                  {'report': report, 'file_url': f'/media/exports/report_{report_id}.docx'})
+
+
+def get_xlsx_file(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+
+    from openpyxl import Workbook
+    from io import BytesIO
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Отчёт_{report.id}"
+
+    headers = ['Товар', 'Категория', 'Кол-во', 'Цена (BYN)', 'Сумма (BYN)']
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.font = cell.font.copy(bold=True)
+
+    for row_num, item in enumerate(report.items.all(), 2):
+        name = item.custom_product_name or (item.product.name if item.product else '—')
+        category = item.category.name if item.category else '—'
+        qty = item.quantity
+        price = float(item.price_used or 0)
+        total = qty * price
+
+        ws.cell(row=row_num, column=1, value=name)
+        ws.cell(row=row_num, column=2, value=category)
+        ws.cell(row=row_num, column=3, value=qty)
+        ws.cell(row=row_num, column=4, value=price)
+        ws.cell(row=row_num, column=5, value=total)
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    print(f"XLSX file size: {len(buffer.getvalue())} bytes")
+
+    response = HttpResponse(buffer.read(),
+                            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="report_{report_id}.xlsx"'
+    return response
+
+def get_docx_file(request, report_id):
+    report = get_object_or_404(Report, pk=report_id)
+
+    from docx import Document
+    from docx.shared import Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from io import BytesIO
+
+    document = Document()
+    document.add_heading(f'Отчёт о продажах №{report.id}', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    p = document.add_paragraph()
+    p.add_run('Менеджер: ').bold = True
+    p.add_run(report.manager.full_name)
+    p.add_run(f'\nДата: ').bold = True
+    p.add_run(str(report.report_date))
+    if report.comments:
+        p.add_run(f'\nКомментарий: ').bold = True
+        p.add_run(report.comments)
+
+    table = document.add_table(rows=1, cols=5)
+    table.style = 'Table Grid'
+    hdr = table.rows[0].cells
+    for i, title in enumerate(['Товар', 'Категория', 'Кол-во', 'Цена (BYN)', 'Сумма (BYN)']):
+        hdr[i].text = title
+        hdr[i].paragraphs[0].runs[0].bold = True
+
+    for item in report.items.all():
+        row = table.add_row().cells
+        row[0].text = item.custom_product_name or (item.product.name if item.product else '—')
+        row[1].text = item.category.name if item.category else '—'
+        row[2].text = str(item.quantity)
+        row[3].text = f"{float(item.price_used or 0):.2f}"
+        row[4].text = f"{item.quantity * float(item.price_used or 0):.2f}"
+
+    buffer = BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer.read(),
+                            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = f'attachment; filename="report_{report_id}.docx"'
+    return response

@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
     path('', views.report_list, name='report_list'),
     path('create/', views.report_create, name='report_create'),
@@ -11,4 +12,8 @@ urlpatterns = [
     path('export/docx/<int:report_id>/', views.export_docx, name='export_docx'),
     path('export/xlsx/<int:report_id>/', views.export_xlsx, name='export_xlsx'),
     path('export/xml/<int:report_id>/', views.export_xml, name='export_xml'),
-]
+    path('preview/xlsx/<int:report_id>/', views.preview_xlsx_js, name='preview_xlsx_js'),
+    path('preview/docx/<int:report_id>/', views.preview_docx_js, name='preview_docx_js'),
+    path('api/report/<int:report_id>/xlsx/', views.get_xlsx_file, name='get_xlsx_file'),
+    path('api/report/<int:report_id>/docx/', views.get_docx_file, name='get_docx_file'),
+    ]
